@@ -22,6 +22,22 @@ app.post('/register', (req, res) => {
     });
 });
 
+// login after registration
+app.post('/login', (req, res) => {
+    const { email } = req.body;
+    const sql = 'SELECT * FROM users WHERE email = ?';
+  
+    db.get(sql, [email], (err, row) => {
+      if (err) return res.status(500).json({ error: err.message });
+      if (!row) return res.status(404).json({ error: 'User not found' });
+  
+      res.json({ message: 'Login successful', user: row });
+    });
+  });
+  
+
+
+
 // 2. Get user data
 app.get('/user/:id', (req, res) => {
     const sql = 'SELECT * FROM users WHERE id = ?';
@@ -33,17 +49,30 @@ app.get('/user/:id', (req, res) => {
     });
 });
 
-// 3. Update user score
+// 3. Update user score only if it's better (lower time)
 app.put('/update-score', (req, res) => {
     const { id, score } = req.body;
-    const sql = 'UPDATE users SET score = ? WHERE id = ?';
-    db.run(sql, [score, id], function (err) {
+
+    const getCurrentScoreSql = 'SELECT score FROM users WHERE id = ?';
+    db.get(getCurrentScoreSql, [id], (err, row) => {
         if (err) {
-            return res.status(400).json({ error: err.message });
+            return res.status(500).json({ error: err.message });
         }
-        res.json({ message: 'Score updated successfully' });
+
+        if (!row || row.score === null || score < row.score) {
+            const updateSql = 'UPDATE users SET score = ? WHERE id = ?';
+            db.run(updateSql, [score, id], function (err) {
+                if (err) {
+                    return res.status(400).json({ error: err.message });
+                }
+                res.json({ message: 'Best score updated!', newScore: score });
+            });
+        } else {
+            res.json({ message: 'Score not updated. Existing score is better.', existingScore: row.score });
+        }
     });
 });
+
 
 // 4. Delete user
 app.delete('/user/:id', (req, res) => {
